@@ -15,7 +15,8 @@
     "deploy:backend": "railway up",
     "deploy:full": "npm run deploy",
     "check:backend": "curl -f http://localhost:8080/health || echo 'Backend not running'",
-    "check:env": "node scripts/check-env.js"
+    "check:env": "node scripts/check-env.js",
+    "test:docker": "bash scripts/test-docker.sh"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",

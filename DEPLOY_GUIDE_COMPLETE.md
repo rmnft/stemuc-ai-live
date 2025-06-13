@@ -4,16 +4,20 @@
 
 ### Arquivos Criados/Atualizados:
 - ✅ `requirements.txt` - Dependências completas incluindo Demucs críticas
-- ✅ `railway.json` - Configuração Railway com startup script
+- ✅ `railway.json` - Configuração Railway com Dockerfile
 - ✅ `Procfile` - Comando de inicialização Railway
 - ✅ `vercel.json` - Configuração Vercel para frontend
+- ✅ `backend/Dockerfile` - Container otimizado para produção
+- ✅ `backend/.dockerignore` - Otimização de build Docker
 - ✅ `backend/startup.py` - Script de inicialização com download de modelos
 - ✅ `backend/security.py` - Rate limiting e validação de arquivos
 - ✅ `backend/cache.py` - Cache inteligente de modelos
 - ✅ `backend/main.py` - Atualizado com segurança e monitoramento
 - ✅ `scripts/deploy.sh` - Script automatizado de deploy
+- ✅ `scripts/test-docker.sh` - Teste Docker local
 - ✅ `scripts/check-env.js` - Verificador de configurações
 - ✅ `railway.env.example` - Variáveis de ambiente Railway
+- ✅ `backend/docker.env.example` - Configuração Docker
 - ✅ `env.production.example` - Variáveis frontend produção
 
 ## 📋 Pré-requisitos

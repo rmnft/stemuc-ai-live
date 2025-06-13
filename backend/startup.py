@@ -41,6 +41,33 @@ def check_system_dependencies():
     except (subprocess.CalledProcessError, FileNotFoundError):
         logger.warning("⚠️ Git não encontrado")
 
+def check_system_resources():
+    """Verificar recursos do sistema."""
+    try:
+        import psutil
+        
+        # Memória
+        memory = psutil.virtual_memory()
+        logger.info(f"💾 Memória: {memory.total / (1024**3):.1f}GB total, "
+                   f"{memory.available / (1024**3):.1f}GB disponível")
+        
+        # Disco
+        disk = psutil.disk_usage('/')
+        logger.info(f"💿 Disco: {disk.total / (1024**3):.1f}GB total, "
+                   f"{disk.free / (1024**3):.1f}GB livre")
+        
+        # CPU
+        logger.info(f"🖥️ CPUs: {psutil.cpu_count()} cores")
+        
+        # Verificar se há memória suficiente (mínimo 1GB)
+        if memory.available < 1024**3:
+            logger.warning("⚠️ Pouca memória disponível - pode afetar performance")
+            
+    except ImportError:
+        logger.warning("⚠️ psutil não instalado - não foi possível verificar recursos")
+    except Exception as e:
+        logger.error(f"❌ Erro ao verificar recursos: {e}")
+
 def setup_environment_variables():
     """Configurar variáveis de ambiente necessárias."""
     # Torch home para modelos
@@ -121,10 +148,13 @@ def main():
         # 3. Verificar dependências do sistema
         check_system_dependencies()
         
-        # 4. Verificar tokens
+        # 4. Verificar recursos do sistema
+        check_system_resources()
+        
+        # 5. Verificar tokens
         verify_tokens()
         
-        # 5. Download de modelos críticos
+        # 6. Download de modelos críticos
         download_critical_models()
         
         logger.info("✅ Inicialização concluída com sucesso!")

@@ -2,6 +2,7 @@ from fastapi import FastAPI, UploadFile, File, HTTPException, Form, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import JSONResponse
 import os
 import shutil
 from typing import List, Optional
@@ -10,6 +11,7 @@ import logging
 import traceback
 import torch
 from demucs import pretrained
+from datetime import datetime
 
 # Import security configurations
 try:
@@ -57,9 +59,11 @@ models_store = {}
 diarizer = None
 
 app = FastAPI(
-    title="Stemuc Audio Forge",
+    title="Stemuc Audio Forge API",
     description="Sistema de separação de áudio com diarização de vozes - FUNCIONAL!",
-    version="1.0.0"
+    version="1.0.0",
+    docs_url="/docs" if os.getenv("NODE_ENV") != "production" else None,
+    redoc_url="/redoc" if os.getenv("NODE_ENV") != "production" else None
 )
 
 # Setup security configurations
@@ -221,6 +225,21 @@ async def system_status():
             "device": str(device),
             "cuda_available": torch.cuda.is_available(),
             "gpu_name": torch.cuda.get_device_name(0) if torch.cuda.is_available() else None
+        }
+    }
+
+@app.get("/")
+async def root():
+    """Endpoint raiz da API."""
+    return {
+        "message": "Stemuc Audio Forge API",
+        "version": "1.0.0",
+        "status": "operational",
+        "endpoints": {
+            "health": "/health",
+            "status": "/status",
+            "separate": "/separate",
+            "docs": "/docs" if os.getenv("NODE_ENV") != "production" else "disabled"
         }
     }
 

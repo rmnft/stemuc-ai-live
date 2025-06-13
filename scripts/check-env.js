@@ -73,11 +73,14 @@ function main() {
     log('\n📋 Verificando arquivos opcionais:', 'blue');
     
     const optionalFiles = [
-        'Dockerfile',
+        'backend/Dockerfile',
+        'backend/.dockerignore',
         'Procfile',
         'backend/startup.py',
         'backend/security.py',
-        'scripts/deploy.sh'
+        'backend/cache.py',
+        'scripts/deploy.sh',
+        'scripts/test-docker.sh'
     ];
 
     optionalFiles.forEach(file => {

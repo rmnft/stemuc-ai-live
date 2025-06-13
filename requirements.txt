@@ -57,6 +57,11 @@ omegaconf>=2.0.0
 slowapi>=0.1.5
 
 # =============
+# SYSTEM MONITORING
+# =============
+psutil>=5.9.0
+
+# =============
 # DEVELOPMENT & TESTING (Optional)
 # =============
 pytest>=7.4.0
