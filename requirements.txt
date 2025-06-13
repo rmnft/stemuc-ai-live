@@ -1,25 +1,64 @@
-# Dependências existentes do Stemuc Audio Forge
+# ==========================================
+# STEMUC AUDIO FORGE - PRODUCTION REQUIREMENTS
+# ==========================================
+
+# =============
+# WEB FRAMEWORK
+# =============
 fastapi>=0.68.0
 uvicorn[standard]>=0.15.0
 python-multipart>=0.0.5
+pydantic>=2.5.0
+
+# =============
+# MACHINE LEARNING & AI
+# =============
 torch>=2.0.0
 torchaudio>=2.0.0
 demucs>=4.0.0
-pydantic>=2.5.0
 
-# Novas dependências para diarização de vozes
+# =============
+# VOICE DIARIZATION
+# =============
 pyannote.audio>=3.1.0
-pydub>=0.25.0
 
-# Dependências de desenvolvimento e testes (opcionais)
-pytest>=7.4.0
-pytest-asyncio>=0.21.0
-
-# Adicionando novas dependências
+# =============
+# AUDIO PROCESSING
+# =============
 librosa>=0.9.0
 soundfile>=0.10.0
+pydub>=0.25.0
+
+# =============
+# SCIENTIFIC COMPUTING
+# =============
 numpy<1.25.0
 scipy
 matplotlib
+
+# =============
+# HTTP & ENVIRONMENT
+# =============
 requests>=2.28.0
 python-dotenv>=0.19.0
+
+# =============
+# DEMUCS DEPENDENCIES (IMPORTANTES!)
+# =============
+julius>=0.2.7
+lameenc>=1.7.0
+dora-search>=0.1.11
+hydra-core>=1.0.0
+omegaconf>=2.0.0
+
+# =============
+# DEVELOPMENT & TESTING (Optional)
+# =============
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+
+# =============
+# =============
+# METRICS (Optional but recommended)
+# =============
+torchmetrics>=0.11.0
