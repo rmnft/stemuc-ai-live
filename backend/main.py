@@ -1,5 +1,6 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException, Form
+from fastapi import FastAPI, UploadFile, File, HTTPException, Form, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.staticfiles import StaticFiles
 import os
 import shutil
@@ -9,6 +10,15 @@ import logging
 import traceback
 import torch
 from demucs import pretrained
+
+# Import security configurations
+try:
+    from security import limiter, validate_audio_file, setup_security_headers, setup_rate_limiting
+    SECURITY_AVAILABLE = True
+    logging.info("✅ Módulo de segurança carregado")
+except ImportError as e:
+    SECURITY_AVAILABLE = False
+    logging.warning(f"⚠️ Módulo de segurança não disponível: {e}")
 
 # Configurações
 from config import config
@@ -50,6 +60,23 @@ app = FastAPI(
     title="Stemuc Audio Forge",
     description="Sistema de separação de áudio com diarização de vozes - FUNCIONAL!",
     version="1.0.0"
+)
+
+# Setup security configurations
+if SECURITY_AVAILABLE:
+    setup_security_headers(app)
+    setup_rate_limiting(app)
+    logger.info("🔒 Configurações de segurança aplicadas")
+
+# Trusted host middleware for production
+app.add_middleware(
+    TrustedHostMiddleware,
+    allowed_hosts=["*"] if os.getenv("NODE_ENV") != "production" else [
+        "*.railway.app", 
+        "*.vercel.app", 
+        "localhost", 
+        "127.0.0.1"
+    ]
 )
 
 @app.on_event("startup")
@@ -133,6 +160,8 @@ def has_vocals(mode: str, selected_stems: Optional[List[str]]) -> bool:
 @app.get("/health")
 async def health_check():
     """Endpoint de verificação de saúde do sistema."""
+    import shutil
+    
     gpu_info = None
     if torch.cuda.is_available():
         gpu_info = {
@@ -142,8 +171,13 @@ async def health_check():
             "memory_cached": torch.cuda.memory_reserved(0)
         }
     
+    # Verificar espaço em disco
+    disk_usage = shutil.disk_usage("/tmp")
+    disk_free_gb = round(disk_usage.free / (1024**3), 2)
+    
     return {
         "status": "healthy",
+        "timestamp": datetime.now().isoformat(),
         "message": "🎉 Sistema funcionando 100%!",
         "diarization_available": diarizer.is_available() if diarizer else False,
         "pyannote_api_configured": config.has_pyannote_api,
@@ -154,20 +188,65 @@ async def health_check():
         "gpu_info": gpu_info,
         "models_loaded": list(models_store.keys()),
         "demucs_ready": len(models_store) > 0,
+        "disk_free_gb": disk_free_gb,
+        "security_enabled": SECURITY_AVAILABLE,
         "full_system_status": "🟢 FULLY OPERATIONAL"
+    }
+
+@app.get("/status")
+async def system_status():
+    """Endpoint detalhado de status do sistema."""
+    try:
+        from cache import model_cache
+        cache_info = model_cache.get_cache_info()
+    except ImportError:
+        cache_info = {"cache": "not_available"}
+    
+    return {
+        "system": {
+            "uptime": "running",
+            "environment": os.getenv("NODE_ENV", "development"),
+            "security_enabled": SECURITY_AVAILABLE
+        },
+        "models": {
+            "loaded": list(models_store.keys()),
+            "cache_info": cache_info
+        },
+        "services": {
+            "diarization": diarizer.is_available() if diarizer else False,
+            "pyannote_api": config.has_pyannote_api,
+            "huggingface": config.has_huggingface_token
+        },
+        "hardware": {
+            "device": str(device),
+            "cuda_available": torch.cuda.is_available(),
+            "gpu_name": torch.cuda.get_device_name(0) if torch.cuda.is_available() else None
+        }
     }
 
 @app.post("/separate")
 async def separate(
+    request: Request,
     file: UploadFile = File(...),
     mode: str = Form(...), 
     selectedStems: Optional[List[str]] = Form(None), 
     enable_diarization: bool = Form(False)
 ):
+    # Apply rate limiting if available
+    if SECURITY_AVAILABLE:
+        try:
+            await limiter.check(request, "5/minute")
+        except Exception as e:
+            logger.warning(f"⚠️ Rate limit aplicado: {e}")
+            raise HTTPException(status_code=429, detail="Muitas requisições. Tente novamente em 1 minuto.")
+    
     try:
         logger.info(f"🎵 Nova requisição: {file.filename}, modo: {mode}, diarização: {enable_diarization}")
         
         # --- Input Validation ---
+        # Use security validation if available
+        if SECURITY_AVAILABLE:
+            validate_audio_file(file)
         if file.content_type not in ["audio/mpeg", "audio/wav", "audio/mp3"]:
             logger.warning(f"❌ Tipo de arquivo inválido: {file.content_type}")
             raise HTTPException(

@@ -1,251 +1,162 @@
 #!/usr/bin/env node
 
-// ===========================================
-// ENVIRONMENT CHECKER SCRIPT
-// ===========================================
+// ==========================================
+// STEMUC AUDIO FORGE - ENVIRONMENT CHECKER
+// ==========================================
 
-const fs = require('fs');
-const path = require('path');
+import fs from 'fs';
+import path from 'path';
 
-// Colors for console output
+console.log('🔍 Verificando configurações de ambiente...\n');
+
+// Cores para output
 const colors = {
-  reset: '\x1b[0m',
-  red: '\x1b[31m',
-  green: '\x1b[32m',
-  yellow: '\x1b[33m',
-  blue: '\x1b[34m',
-  cyan: '\x1b[36m'
+    red: '\x1b[31m',
+    green: '\x1b[32m',
+    yellow: '\x1b[33m',
+    blue: '\x1b[34m',
+    reset: '\x1b[0m'
 };
 
-// Helper functions
-const log = (message, color = 'reset') => {
-  console.log(`${colors[color]}${message}${colors.reset}`);
-};
+function log(message, color = 'reset') {
+    console.log(`${colors[color]}${message}${colors.reset}`);
+}
 
-const logSuccess = (message) => log(`✅ ${message}`, 'green');
-const logError = (message) => log(`❌ ${message}`, 'red');
-const logWarning = (message) => log(`⚠️  ${message}`, 'yellow');
-const logInfo = (message) => log(`ℹ️  ${message}`, 'blue');
+function checkFileExists(filePath, required = true) {
+    const exists = fs.existsSync(filePath);
+    if (exists) {
+        log(`✅ ${filePath} encontrado`, 'green');
+        return true;
+    } else {
+        log(`${required ? '❌' : '⚠️'} ${filePath} ${required ? 'não encontrado' : 'opcional - não encontrado'}`, required ? 'red' : 'yellow');
+        return false;
+    }
+}
 
-// Check if file exists
-const fileExists = (filePath) => {
-  try {
-    return fs.existsSync(filePath);
-  } catch (error) {
-    return false;
-  }
-};
-
-// Load environment variables
-const loadEnvFile = (filePath) => {
-  try {
-    if (!fileExists(filePath)) return {};
+function checkEnvVar(envContent, varName, required = true) {
+    const regex = new RegExp(`^${varName}=(.+)$`, 'm');
+    const match = envContent.match(regex);
     
-    const content = fs.readFileSync(filePath, 'utf8');
-    const env = {};
+    if (match && match[1] && match[1].trim() !== '') {
+        log(`✅ ${varName} configurado`, 'green');
+        return true;
+    } else {
+        log(`${required ? '❌' : '⚠️'} ${varName} ${required ? 'não configurado' : 'opcional - não configurado'}`, required ? 'red' : 'yellow');
+        return false;
+    }
+}
+
+function main() {
+    let hasErrors = false;
+    let hasWarnings = false;
+
+    // Verificar arquivos essenciais
+    log('📋 Verificando arquivos essenciais:', 'blue');
     
-    content.split('\n').forEach(line => {
-      const trimmed = line.trim();
-      if (trimmed && !trimmed.startsWith('#')) {
-        const [key, ...valueParts] = trimmed.split('=');
-        if (key && valueParts.length > 0) {
-          env[key.trim()] = valueParts.join('=').trim();
+    const essentialFiles = [
+        'package.json',
+        'requirements.txt',
+        'backend/main.py',
+        'backend/config.py',
+        'src/config/environment.ts',
+        'railway.json',
+        'vercel.json'
+    ];
+
+    essentialFiles.forEach(file => {
+        if (!checkFileExists(file)) {
+            hasErrors = true;
         }
-      }
     });
+
+    // Verificar arquivos opcionais
+    log('\n📋 Verificando arquivos opcionais:', 'blue');
     
-    return env;
-  } catch (error) {
-    logError(`Error reading ${filePath}: ${error.message}`);
-    return {};
-  }
-};
-
-// Check required files
-const checkRequiredFiles = () => {
-  logInfo('Checking required files...');
-  
-  const requiredFiles = [
-    'package.json',
-    'vite.config.ts',
-    'Dockerfile',
-    'railway.json',
-    'backend/main.py',
-    'backend/config.py',
-    'requirements.txt'
-  ];
-  
-  let allFilesExist = true;
-  
-  requiredFiles.forEach(file => {
-    if (fileExists(file)) {
-      logSuccess(`${file} exists`);
-    } else {
-      logError(`${file} is missing`);
-      allFilesExist = false;
-    }
-  });
-  
-  return allFilesExist;
-};
-
-// Check environment variables
-const checkEnvironmentVariables = () => {
-  logInfo('Checking environment variables...');
-  
-  // Load .env files
-  const env = loadEnvFile('.env');
-  const envExample = loadEnvFile('env.example');
-  
-  // Required variables
-  const requiredVars = [
-    'HUGGINGFACE_TOKEN'
-  ];
-  
-  // Optional but recommended variables
-  const optionalVars = [
-    'PYANNOTE_API_KEY',
-    'NODE_ENV',
-    'MAX_FILE_SIZE',
-    'USE_GPU'
-  ];
-  
-  let hasAllRequired = true;
-  
-  // Check required variables
-  logInfo('Required variables:');
-  requiredVars.forEach(varName => {
-    if (env[varName] && env[varName] !== 'your_token_here') {
-      logSuccess(`${varName} is set`);
-    } else {
-      logError(`${varName} is missing or not configured`);
-      hasAllRequired = false;
-    }
-  });
-  
-  // Check optional variables
-  logInfo('Optional variables:');
-  optionalVars.forEach(varName => {
-    if (env[varName] && env[varName] !== 'your_api_key_here') {
-      logSuccess(`${varName} is set`);
-    } else {
-      logWarning(`${varName} is not set (optional)`);
-    }
-  });
-  
-  return hasAllRequired;
-};
-
-// Check dependencies
-const checkDependencies = () => {
-  logInfo('Checking package.json dependencies...');
-  
-  try {
-    const packageJson = JSON.parse(fs.readFileSync('package.json', 'utf8'));
-    
-    // Check if essential dependencies are present
-    const essentialDeps = [
-      'react',
-      'react-dom',
-      'vite',
-      '@vitejs/plugin-react-swc',
-      'fastapi' // This would be in requirements.txt, but checking structure
+    const optionalFiles = [
+        'Dockerfile',
+        'Procfile',
+        'backend/startup.py',
+        'backend/security.py',
+        'scripts/deploy.sh'
     ];
-    
-    const allDeps = {
-      ...packageJson.dependencies,
-      ...packageJson.devDependencies
-    };
-    
-    essentialDeps.forEach(dep => {
-      if (dep === 'fastapi') return; // Skip this one for frontend check
-      
-      if (allDeps[dep]) {
-        logSuccess(`${dep} is installed`);
-      } else {
-        logWarning(`${dep} might be missing`);
-      }
-    });
-    
-    logSuccess('Frontend dependencies look good');
-    return true;
-  } catch (error) {
-    logError(`Error checking dependencies: ${error.message}`);
-    return false;
-  }
-};
 
-// Check backend requirements
-const checkBackendRequirements = () => {
-  logInfo('Checking Python requirements...');
-  
-  if (!fileExists('requirements.txt')) {
-    logError('requirements.txt is missing');
-    return false;
-  }
-  
-  try {
-    const requirements = fs.readFileSync('requirements.txt', 'utf8');
-    const essentialPackages = [
-      'fastapi',
-      'uvicorn',
-      'torch',
-      'demucs',
-      'pyannote.audio'
+    optionalFiles.forEach(file => {
+        if (!checkFileExists(file, false)) {
+            hasWarnings = true;
+        }
+    });
+
+    // Verificar arquivo .env
+    log('\n🔧 Verificando variáveis de ambiente:', 'blue');
+    
+    if (fs.existsSync('.env')) {
+        const envContent = fs.readFileSync('.env', 'utf8');
+        
+        // Variáveis obrigatórias
+        const requiredVars = ['HUGGINGFACE_TOKEN'];
+        
+        requiredVars.forEach(varName => {
+            if (!checkEnvVar(envContent, varName)) {
+                hasErrors = true;
+            }
+        });
+
+        // Variáveis opcionais
+        const optionalVars = ['PYANNOTE_API_KEY', 'NODE_ENV', 'VITE_BACKEND_URL'];
+        
+        optionalVars.forEach(varName => {
+            if (!checkEnvVar(envContent, varName, false)) {
+                hasWarnings = true;
+            }
+        });
+    } else {
+        log('❌ Arquivo .env não encontrado', 'red');
+        log('📝 Crie um arquivo .env baseado no env.example', 'yellow');
+        hasErrors = true;
+    }
+
+    // Verificar diretórios necessários
+    log('\n📁 Verificando diretórios:', 'blue');
+    
+    const directories = [
+        'backend',
+        'src',
+        'scripts'
     ];
-    
-    essentialPackages.forEach(pkg => {
-      if (requirements.includes(pkg)) {
-        logSuccess(`${pkg} is in requirements.txt`);
-      } else {
-        logError(`${pkg} is missing from requirements.txt`);
-      }
+
+    directories.forEach(dir => {
+        if (!checkFileExists(dir)) {
+            hasErrors = true;
+        }
     });
+
+    // Verificar se está no diretório correto
+    if (!fs.existsSync('package.json')) {
+        log('❌ Execute este script na raiz do projeto', 'red');
+        hasErrors = true;
+    }
+
+    // Resumo final
+    log('\n📊 Resumo da verificação:', 'blue');
     
-    return true;
-  } catch (error) {
-    logError(`Error reading requirements.txt: ${error.message}`);
-    return false;
-  }
-};
+    if (hasErrors) {
+        log('❌ Foram encontrados erros críticos que precisam ser corrigidos', 'red');
+        log('💡 Consulte o DEPLOY_GUIDE.md para instruções detalhadas', 'yellow');
+    } else if (hasWarnings) {
+        log('⚠️ Configuração básica OK, mas há itens opcionais em falta', 'yellow');
+        log('✅ Projeto pronto para deploy básico', 'green');
+    } else {
+        log('🎉 Todas as configurações estão corretas!', 'green');
+        log('✅ Projeto totalmente pronto para deploy', 'green');
+    }
 
-// Main function
-const main = () => {
-  console.log('🔍 Stemuc Audio Forge Environment Checker');
-  console.log('==========================================');
-  console.log('');
-  
-  let allChecksPass = true;
-  
-  // Run all checks
-  allChecksPass &= checkRequiredFiles();
-  console.log('');
-  
-  allChecksPass &= checkEnvironmentVariables();
-  console.log('');
-  
-  allChecksPass &= checkDependencies();
-  console.log('');
-  
-  allChecksPass &= checkBackendRequirements();
-  console.log('');
-  
-  // Final result
-  if (allChecksPass) {
-    logSuccess('All checks passed! Your environment is ready for deployment 🚀');
-  } else {
-    logError('Some checks failed. Please fix the issues above before deploying.');
-    process.exit(1);
-  }
-  
-  console.log('');
-  console.log('Next steps:');
-  console.log('1. Set up your Hugging Face token');
-  console.log('2. Run: npm run deploy');
-  console.log('3. Configure environment variables in Railway dashboard');
-  console.log('');
-  console.log('Happy deploying! 🎵');
-};
+    // Próximos passos
+    log('\n🚀 Próximos passos:', 'blue');
+    log('1. npm run build - Fazer build do frontend');
+    log('2. npm run deploy - Executar script de deploy');
+    log('3. Configurar URLs nos serviços de deploy');
+    
+    process.exit(hasErrors ? 1 : 0);
+}
 
-// Run the checks
 main(); 

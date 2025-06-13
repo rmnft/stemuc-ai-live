@@ -43,7 +43,7 @@ requests>=2.28.0
 python-dotenv>=0.19.0
 
 # =============
-# DEMUCS DEPENDENCIES (CRÍTICAS!)
+# DEMUCS DEPENDENCIES (IMPORTANTES!)
 # =============
 julius>=0.2.7
 lameenc>=1.7.0
@@ -52,22 +52,12 @@ hydra-core>=1.0.0
 omegaconf>=2.0.0
 
 # =============
-# RATE LIMITING & SECURITY
-# =============
-slowapi>=0.1.5
-
-# =============
 # DEVELOPMENT & TESTING (Optional)
 # =============
 pytest>=7.4.0
 pytest-asyncio>=0.21.0
 
 # =============
-# AUDIO EVALUATION (Optional)
-# =============
-museval>=0.4.0
-stempeg>=0.1.8
-
 # =============
 # METRICS (Optional but recommended)
 # =============
