@@ -16,7 +16,10 @@
     "deploy:full": "npm run deploy",
     "check:backend": "curl -f http://localhost:8080/health || echo 'Backend not running'",
     "check:env": "node scripts/check-env.js",
-    "test:docker": "bash scripts/test-docker.sh"
+    "test:docker": "bash scripts/test-docker.sh",
+    "test:build": "bash scripts/test-build.sh",
+    "test:build:ps": "powershell -ExecutionPolicy Bypass -File scripts/test-build.ps1",
+    "build:prod": "cp env.production.template .env.production && npm run build"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",

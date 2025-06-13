@@ -9,7 +9,8 @@ import ProcessingScreen from '@/components/ProcessingScreen';
 import ResultsView from '@/components/ResultsView';
 import { ArrowUp, Settings, ArrowDown } from 'lucide-react';
 
-import { getApiUrl, config } from '@/config/environment';
+import { api, fetchUpload } from '@/config/api';
+import { config } from '@/config/environment';
 
 const Index: React.FC = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -71,10 +72,7 @@ const Index: React.FC = () => {
 
     try {
       console.log(`Sending ${selectedFile.name} for mode: ${separationConfig.mode}, custom stems: ${separationConfig.selectedCustomStems?.join(', ')}, diarization: ${separationConfig.enableDiarization}`);
-      const response = await fetch(getApiUrl('/separate'), {
-        method: 'POST',
-        body: formData,
-      });
+      const response = await fetchUpload(api.separate, formData);
 
       if (!response.ok) {
         let errorDetail = `HTTP error ${response.status}`; 
