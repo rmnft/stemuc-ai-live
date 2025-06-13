@@ -1,0 +1,25 @@
+# Dependências existentes do Stemuc Audio Forge
+fastapi>=0.68.0
+uvicorn[standard]>=0.15.0
+python-multipart>=0.0.5
+torch>=2.0.0
+torchaudio>=2.0.0
+demucs>=4.0.0
+pydantic>=2.5.0
+
+# Novas dependências para diarização de vozes
+pyannote.audio>=3.1.0
+pydub>=0.25.0
+
+# Dependências de desenvolvimento e testes (opcionais)
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+
+# Adicionando novas dependências
+librosa>=0.9.0
+soundfile>=0.10.0
+numpy<1.25.0
+scipy
+matplotlib
+requests>=2.28.0
+python-dotenv>=0.19.0
