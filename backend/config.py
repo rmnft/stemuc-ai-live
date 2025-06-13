@@ -15,7 +15,7 @@ class Config:
     
     def __init__(self):
         # Tokens de autenticação
-        self.HUGGINGFACE_TOKEN = os.getenv("HUGGINGFACE_TOKEN", "REMOVED_HUGGINGFACE_TOKEN ")
+        self.HUGGINGFACE_TOKEN = os.getenv("HUGGINGFACE_TOKEN")
         self.PYANNOTE_API_KEY = os.getenv("PYANNOTE_API_KEY")
         
         # Configurações de diretórios

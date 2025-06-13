@@ -4,7 +4,7 @@
 env_content = """# Configurações do Stemuc Audio Forge
 
 # Token do Hugging Face (obrigatório para modelos pyannote locais)
-HUGGINGFACE_TOKEN=REMOVED_HUGGINGFACE_TOKEN 
+HUGGINGFACE_TOKEN=your_token_here 
 
 # API Key da pyannoteAI (para serviço premium)
 PYANNOTE_API_KEY=sk_644fc53fb65e4b17a56123395ccb88e4
