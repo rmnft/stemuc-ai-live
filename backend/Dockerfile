@@ -41,7 +41,7 @@ RUN pip install --upgrade pip setuptools wheel && \
     pip install -r requirements.txt
 
 # Criar diretórios necessários com permissões corretas
-RUN mkdir -p /app/uploads /app/separated /app/models /app/logs && \
+RUN mkdir -p /app/uploads /app/separated /app/models /app/logs /app/stems && \
     chown -R appuser:appuser /app
 
 # Copiar código da aplicação
@@ -61,5 +61,5 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD curl -f http://localhost:${PORT:-8080}/health || exit 1
 
-# Comando de inicialização
-CMD ["sh", "-c", "python startup.py && uvicorn main:app --host 0.0.0.0 --port ${PORT:-8080} --workers 1"] 
+# Comando de inicialização - CORRIGIDO SEM STARTUP.PY
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"] 
