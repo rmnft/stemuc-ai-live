@@ -130,10 +130,12 @@ app.mount("/original_audio", StaticFiles(directory=config.UPLOAD_DIR), name="ori
 
 # CORS configuration for production
 ALLOWED_ORIGINS = [
-    "http://localhost:8082",  # Development frontend
-    "http://localhost:3000",  # Alternative dev port
-    "https://*.vercel.app",   # Vercel deployment
-    "https://*.railway.app",  # Railway deployment
+    "https://stemuc-ai-live.vercel.app",  # Vercel production
+    "https://*.vercel.app",               # Vercel preview deployments
+    "http://localhost:5173",              # Vite development
+    "http://localhost:3000",              # Alternative dev port
+    "http://localhost:8082",              # Legacy dev port
+    "https://*.railway.app",              # Railway deployment
 ]
 
 # Add environment-specific origins
@@ -146,6 +148,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"]
 )
 
 class SeparationRequest(BaseModel):
