@@ -8,8 +8,11 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-# Rate limiter configuration
-limiter = Limiter(key_func=get_remote_address)
+# Rate limiter configuration - More permissive for production
+limiter = Limiter(
+    key_func=get_remote_address,
+    default_limits=["100/minute", "1000/hour"]  # More generous limits
+)
 
 # File validation settings
 ALLOWED_EXTENSIONS = {'.mp3', '.wav', '.flac', '.m4a'}
@@ -50,6 +53,27 @@ def setup_security_headers(app):
         response.headers["Content-Security-Policy"] = "default-src 'self'; img-src 'self' data: https:; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'"
         
         return response
+
+def get_rate_limit_for_endpoint(endpoint: str, is_production: bool = False):
+    """Get appropriate rate limit for specific endpoint."""
+    if is_production:
+        # More generous limits for production
+        limits = {
+            "separate": "50/minute",      # Audio processing
+            "health": "200/minute",       # Health checks
+            "status": "100/minute",       # Status checks
+            "default": "100/minute"       # Default for other endpoints
+        }
+    else:
+        # Stricter limits for development/testing
+        limits = {
+            "separate": "10/minute",
+            "health": "60/minute", 
+            "status": "30/minute",
+            "default": "20/minute"
+        }
+    
+    return limits.get(endpoint, limits["default"])
 
 def setup_rate_limiting(app):
     """Setup rate limiting for the app."""

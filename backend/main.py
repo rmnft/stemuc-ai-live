@@ -15,7 +15,7 @@ from datetime import datetime
 
 # Import security configurations
 try:
-    from security import limiter, validate_audio_file, setup_security_headers, setup_rate_limiting
+    from security import limiter, validate_audio_file, setup_security_headers, setup_rate_limiting, get_rate_limit_for_endpoint
     SECURITY_AVAILABLE = True
     logging.info("✅ Módulo de segurança carregado")
 except ImportError as e:
@@ -135,7 +135,8 @@ ALLOWED_ORIGINS = [
     "http://localhost:5173",              # Vite development
     "http://localhost:3000",              # Alternative dev port
     "http://localhost:8082",              # Legacy dev port
-    "https://*.railway.app",              # Railway deployment
+    "https://*.railway.app",
+    # Railway deployment
 ]
 
 # Add environment-specific origins
@@ -254,13 +255,16 @@ async def separate(
     selectedStems: Optional[List[str]] = Form(None), 
     enable_diarization: bool = Form(False)
 ):
-    # Apply rate limiting if available
+    # Apply rate limiting if available - Dynamic based on environment
     if SECURITY_AVAILABLE:
         try:
-            await limiter.check(request, "5/minute")
+            is_production = os.getenv("NODE_ENV") == "production"
+            rate_limit = get_rate_limit_for_endpoint("separate", is_production)
+            await limiter.check(request, rate_limit)
+            logger.debug(f"🔒 Rate limit check passed: {rate_limit}")
         except Exception as e:
             logger.warning(f"⚠️ Rate limit aplicado: {e}")
-            raise HTTPException(status_code=429, detail="Muitas requisições. Tente novamente em 1 minuto.")
+            raise HTTPException(status_code=429, detail="Muitas requisições. Tente novamente em alguns segundos.")
     
     try:
         logger.info(f"🎵 Nova requisição: {file.filename}, modo: {mode}, diarização: {enable_diarization}")

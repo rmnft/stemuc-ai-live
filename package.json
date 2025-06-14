@@ -20,6 +20,7 @@
     "test:build": "bash scripts/test-build.sh",
     "test:build:ps": "powershell -ExecutionPolicy Bypass -File scripts/test-build.ps1",
     "test:endpoints": "node scripts/test-endpoints.js",
+    "test:rate-limit": "node scripts/test-rate-limiting.js",
     "build:prod": "cp env.production.template .env.production && npm run build"
   },
   "dependencies": {
