@@ -61,7 +61,7 @@ diarizer = None
 app = FastAPI(
     title="Stemuc Audio Forge API",
     description="Sistema de separação de áudio com diarização de vozes - FUNCIONAL!",
-    version="1.0.0",
+    version="1.0.1",
     docs_url="/docs" if os.getenv("NODE_ENV") != "production" else None,
     redoc_url="/redoc" if os.getenv("NODE_ENV") != "production" else None
 )
