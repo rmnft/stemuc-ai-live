@@ -15,12 +15,13 @@ from datetime import datetime
 
 # Import security configurations
 try:
-    from security import limiter, validate_audio_file, setup_security_headers, setup_rate_limiting, get_rate_limit_for_endpoint
+    from security import limiter, validate_audio_file, setup_security_headers, setup_rate_limiting
     SECURITY_AVAILABLE = True
     logging.info("✅ Módulo de segurança carregado")
 except ImportError as e:
     SECURITY_AVAILABLE = False
     logging.warning(f"⚠️ Módulo de segurança não disponível: {e}")
+    limiter = None
 
 # Configurações
 from config import config
@@ -135,8 +136,7 @@ ALLOWED_ORIGINS = [
     "http://localhost:5173",              # Vite development
     "http://localhost:3000",              # Alternative dev port
     "http://localhost:8082",              # Legacy dev port
-    "https://*.railway.app",
-    # Railway deployment
+    "https://*.railway.app",              # Railway deployment
 ]
 
 # Add environment-specific origins
@@ -247,36 +247,57 @@ async def root():
         }
     }
 
-@app.post("/separate")
-async def separate(
-    request: Request,
-    file: UploadFile = File(...),
-    mode: str = Form(...), 
-    selectedStems: Optional[List[str]] = Form(None), 
-    enable_diarization: bool = Form(False)
-):
-    # Apply rate limiting if available - Dynamic based on environment
-    if SECURITY_AVAILABLE:
-        try:
-            is_production = os.getenv("NODE_ENV") == "production"
-            rate_limit = get_rate_limit_for_endpoint("separate", is_production)
-            await limiter.check(request, rate_limit)
-            logger.debug(f"🔒 Rate limit check passed: {rate_limit}")
-        except Exception as e:
-            logger.warning(f"⚠️ Rate limit aplicado: {e}")
-            raise HTTPException(status_code=429, detail="Muitas requisições. Tente novamente em alguns segundos.")
+# Adicionar decorator de rate limiting se disponível
+if SECURITY_AVAILABLE and limiter:
+    # Em produção: 10 requests por minuto, desenvolvimento: 100 requests por minuto
+    rate_limit = "10/minute" if os.getenv("NODE_ENV") == "production" else "100/minute"
     
+    @app.post("/separate")
+    @limiter.limit(rate_limit)
+    async def separate(
+        request: Request,
+        file: UploadFile = File(...),
+        mode: str = Form(...), 
+        selectedStems: Optional[List[str]] = Form(None), 
+        enable_diarization: bool = Form(False)
+    ):
+        return await _separate_handler(request, file, mode, selectedStems, enable_diarization)
+else:
+    # Sem rate limiting
+    @app.post("/separate")
+    async def separate(
+        request: Request,
+        file: UploadFile = File(...),
+        mode: str = Form(...), 
+        selectedStems: Optional[List[str]] = Form(None), 
+        enable_diarization: bool = Form(False)
+    ):
+        return await _separate_handler(request, file, mode, selectedStems, enable_diarization)
+
+# Função principal de separação (sem rate limiting direto)
+async def _separate_handler(
+    request: Request,
+    file: UploadFile,
+    mode: str,
+    selectedStems: Optional[List[str]],
+    enable_diarization: bool
+):
     try:
         logger.info(f"🎵 Nova requisição: {file.filename}, modo: {mode}, diarização: {enable_diarization}")
         
         # --- Input Validation ---
         # Use security validation if available
         if SECURITY_AVAILABLE:
-            validate_audio_file(file)
-        if file.content_type not in ["audio/mpeg", "audio/wav", "audio/mp3"]:
+            try:
+                validate_audio_file(file)
+            except Exception as e:
+                logger.warning(f"❌ Validação de segurança falhou: {e}")
+                # Continue mesmo se a validação de segurança falhar
+        
+        if file.content_type not in ["audio/mpeg", "audio/wav", "audio/mp3", "audio/flac", "audio/x-wav", "audio/x-mpeg"]:
             logger.warning(f"❌ Tipo de arquivo inválido: {file.content_type}")
             raise HTTPException(
-                status_code=400, detail=f"Tipo de arquivo inválido: {file.content_type}. Use MP3 ou WAV."
+                status_code=400, detail=f"Tipo de arquivo inválido: {file.content_type}. Use MP3, WAV ou FLAC."
             )
 
         if file.size > config.MAX_FILE_SIZE:
