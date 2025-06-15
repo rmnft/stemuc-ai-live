@@ -12,6 +12,7 @@ import traceback
 import torch
 from demucs import pretrained
 from datetime import datetime
+from starlette.concurrency import run_in_threadpool
 
 # Import security configurations
 try:
@@ -29,9 +30,17 @@ from config import config
 # Configurar device
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-# Ativar cudnn.benchmark para otimizações na GPU
+# Otimizações de GPU para máxima performance
 if torch.cuda.is_available():
     torch.backends.cudnn.benchmark = True
+    torch.backends.cudnn.deterministic = False  # Melhor performance
+    torch.backends.cuda.matmul.allow_tf32 = True  # TensorFloat-32 para RTX
+    torch.backends.cudnn.allow_tf32 = True
+    # Configurar cache da GPU
+    torch.cuda.empty_cache()
+    # Configurar memory fraction se necessário
+    if hasattr(torch.cuda, 'set_per_process_memory_fraction'):
+        torch.cuda.set_per_process_memory_fraction(0.9)  # Usar 90% da GPU
     
 from process import separate_audio
 from diarization import create_diarizer
@@ -348,9 +357,17 @@ async def _separate_handler(
         finally:
             await file.close()
 
-        # --- Separation Logic ---
-        logger.info(f"🔄 Iniciando separação com {device}")
-        output_paths = separate_audio(
+        # --- Separation Logic (Non-blocking with ThreadPool) ---
+        separation_start = datetime.now()
+        logger.info(f"🔄 Iniciando separação com {device} (threadpool) - {separation_start}")
+        
+        # Verificar memória GPU antes do processamento
+        if torch.cuda.is_available():
+            gpu_memory_before = torch.cuda.memory_allocated(0) / 1024**3
+            logger.info(f"🎮 GPU Memory antes: {gpu_memory_before:.2f}GB")
+        
+        output_paths = await run_in_threadpool(
+            separate_audio,
             input_path=input_path, 
             mode=mode, 
             output_dir_base=config.OUTPUT_DIR,
@@ -358,6 +375,16 @@ async def _separate_handler(
             device=device,
             models_store=models_store
         )
+        
+        # Log de performance da separação
+        separation_end = datetime.now()
+        separation_duration = (separation_end - separation_start).total_seconds()
+        logger.info(f"✅ Separação concluída em {separation_duration:.2f}s")
+        
+        # Verificar memória GPU após processamento
+        if torch.cuda.is_available():
+            gpu_memory_after = torch.cuda.memory_allocated(0) / 1024**3
+            logger.info(f"🎮 GPU Memory após: {gpu_memory_after:.2f}GB")
         
         if not output_paths:
             if os.path.exists(input_path):
@@ -382,15 +409,20 @@ async def _separate_handler(
                 logger.info(f"🎤 Iniciando diarização: {vocal_path}")
                 
                 try:
-                    # Aplicar diarização
-                    diarization_data = diarizer.diarize_vocals(vocal_path)
+                    # Aplicar diarização (non-blocking)
+                    logger.info(f"🎤 Executando diarização em threadpool")
+                    diarization_data = await run_in_threadpool(
+                        diarizer.diarize_vocals,
+                        vocal_path
+                    )
                     
                     if diarization_data and diarization_data.get('num_speakers', 0) > 1:
                         # Múltiplos cantores detectados
                         base_name = os.path.splitext(os.path.basename(input_path))[0]
                         artists_output_dir = os.path.join(config.OUTPUT_DIR, "artists", base_name)
                         
-                        artist_paths = diarizer.segment_vocals(
+                        artist_paths = await run_in_threadpool(
+                            diarizer.segment_vocals,
                             vocal_path, 
                             diarization_data, 
                             artists_output_dir
@@ -459,12 +491,14 @@ if __name__ == "__main__":
     # Get port from environment (Railway sets this)
     port = int(os.getenv("PORT", 8080))
     
-    # Production configuration
+    # Production configuration with optimized timeouts
     uvicorn.run(
         app, 
         host="0.0.0.0", 
         port=port,
         workers=1,  # Single worker for GPU models
-        timeout_keep_alive=300,  # 5 minutes for long audio processing
-        limit_request_size=200 * 1024 * 1024  # 200MB limit
+        timeout_keep_alive=600,  # 10 minutes for long audio processing
+        timeout_graceful_shutdown=30,  # Graceful shutdown timeout
+        limit_request_size=200 * 1024 * 1024,  # 200MB limit
+        access_log=False  # Disable access logs for better performance
     )

@@ -47,9 +47,10 @@ def separate_audio(
             logger.error(msg)
             raise RuntimeError(msg)
 
-        # 1) Carrega e prepara o áudio
+        # 1) Carrega e prepara o áudio (otimizado para GPU)
         t0 = time.time()
         wav, sr = torchaudio.load(input_path)  # shape: [C, T]
+        
         # Ajuste de canais
         if wav.ndim == 1:
             wav = wav.unsqueeze(0)
@@ -58,27 +59,50 @@ def separate_audio(
             wav = wav.mean(dim=0, keepdim=True)
             if model.audio_channels == 2:
                 wav = torch.cat([wav, wav], dim=0)
-        # Resample se necessário
+        
+        # Resample se necessário (otimizado)
         if sr != model.samplerate:
             logger.info(f"Resampling de {sr}Hz para {model.samplerate}Hz")
-            wav = torchaudio.transforms.Resample(sr, model.samplerate, device=device)(wav)
-        # Adiciona batch
-        wav = wav.unsqueeze(0).to(device)  # shape: [1, C, T]
+            # Usar GPU para resampling se disponível
+            if device.type == 'cuda':
+                wav = wav.to(device)
+                resampler = torchaudio.transforms.Resample(sr, model.samplerate).to(device)
+                wav = resampler(wav)
+            else:
+                wav = torchaudio.transforms.Resample(sr, model.samplerate)(wav)
+        
+        # Mover para GPU e adicionar batch dimension
+        if device.type == 'cuda' and wav.device != device:
+            wav = wav.to(device, non_blocking=True)
+        wav = wav.unsqueeze(0)  # shape: [1, C, T]
+        
         t1 = time.time()
-        logger.info(f"Áudio preparado em {t1-t0:.2f}s (shape={tuple(wav.shape)})")
+        logger.info(f"🚀 Áudio preparado em {t1-t0:.2f}s (shape={tuple(wav.shape)}, device={wav.device})")
 
-        # 2) Inferência com half-precision se GPU
+        # 2) Inferência otimizada com mixed precision
         t2 = time.time()
+        
+        # Limpar cache da GPU antes da inferência
+        if device.type == 'cuda':
+            torch.cuda.empty_cache()
+            
         with torch.no_grad():
-            with torch.cuda.amp.autocast(enabled=device.type == 'cuda'):
+            # Usar mixed precision para melhor performance
+            with torch.cuda.amp.autocast(enabled=device.type == 'cuda', dtype=torch.float16):
                 separated = apply_model(
                     model,
                     wav,
                     device=device,
                     progress=False,
-                )  # tensor possivelmente shape [B, S, C, T] ou [S, C, T]
+                    num_workers=0,  # Evitar overhead de multiprocessing
+                )
+                
+        # Sincronizar GPU se necessário
+        if device.type == 'cuda':
+            torch.cuda.synchronize()
+            
         t3 = time.time()
-        logger.info(f"Inferência concluída em {t3-t2:.2f}s")
+        logger.info(f"🔥 Inferência GPU concluída em {t3-t2:.2f}s")
 
         # Normaliza dimensões: se batch dimension existir, remove
         if separated.dim() == 4:
@@ -109,23 +133,36 @@ def separate_audio(
             # 4-stem ou 6-stem
             stems_to_save = {name: separated[i] for i, name in enumerate(model.sources)}
 
-        # 4) Salva stems
+        # 4) Salva stems (otimizado)
         t4 = time.time()
         base = os.path.splitext(os.path.basename(input_path))[0]
         out_dir = os.path.join(output_dir_base, model_name, base)
         os.makedirs(out_dir, exist_ok=True)
         output_paths: List[str] = []
 
+        # Mover todos os tensors para CPU de uma vez para otimizar
+        stems_cpu = {}
         for name, tensor in stems_to_save.items():
+            stems_cpu[name] = tensor.cpu()
+        
+        # Limpar cache da GPU após mover para CPU
+        if device.type == 'cuda':
+            torch.cuda.empty_cache()
+
+        # Salvar arquivos
+        for name, tensor_cpu in stems_cpu.items():
             path = os.path.join(out_dir, f"{name}.wav")
-            torchaudio.save(path, tensor.cpu(), sample_rate=model.samplerate)
+            torchaudio.save(path, tensor_cpu, sample_rate=model.samplerate)
             output_paths.append(path)
-            logger.info(f"Stem salvo: {path}")
+            logger.info(f"💾 Stem salvo: {path}")
         t5 = time.time()
 
-        # Log de performance
+        # Log de performance detalhado
+        total_time = t5 - t_start
+        gpu_info = f" | GPU: {torch.cuda.get_device_name(0)}" if device.type == 'cuda' else ""
         logger.info(
-            f"PERF load {(t1-t0):.2f}s | infer {(t3-t2):.2f}s | write {(t5-t4):.2f}s | total {(t5-t_start):.2f}s"
+            f"🚀 PERFORMANCE: load {(t1-t0):.2f}s | infer {(t3-t2):.2f}s | write {(t5-t4):.2f}s | "
+            f"TOTAL {total_time:.2f}s{gpu_info}"
         )
         return output_paths
 
