@@ -1,6 +1,10 @@
 // Test GPU Performance for Audio Processing
-const fs = require('fs');
-const path = require('path');
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const API_URL = 'https://stemuc-ai-live-production.up.railway.app';
 
@@ -165,10 +169,5 @@ async function runAllTests() {
     }
 }
 
-// Export for use in other scripts
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { runAllTests, testGPUPerformance };
-} else {
-    // Browser environment - run tests
-    runAllTests().catch(console.error);
-} 
+// Run tests directly
+runAllTests().catch(console.error); 

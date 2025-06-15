@@ -18,8 +18,8 @@ export const config = {
       return import.meta.env.VITE_RAILWAY_URL;
     }
     
-    // Final fallback - will need to be updated with actual Railway URL
-    return 'https://your-backend.railway.app';
+    // Final fallback - updated with actual Railway URL
+    return 'https://stemuc-ai-live-production.up.railway.app';
   })(),
   
   // API endpoints
